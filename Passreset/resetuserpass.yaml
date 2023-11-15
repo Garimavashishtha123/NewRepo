@@ -1,0 +1,61 @@
+trigger:
+  branches:
+    exclude:
+      - '*'
+
+variables:
+- group: user-management-password
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  stages: # Run the script to reset passwords
+     displayName: 'Reset User Password'
+    steps:
+    
+    - task: AzurePowerShell@5
+      inputs:
+        ScriptType: 'InlineScript'
+        Inline: |
+          # Import the Active Directory module if not already loaded
+              Import-Module ActiveDirectory
+          
+              # Define the maximum and minimum age for password reset
+              $minPasswordAge = 75
+              $maxPasswordAge = 90
+          
+              # Calculate the date range for password reset
+              $minDate = (Get-Date).AddDays(-$maxPasswordAge)
+              $maxDate = (Get-Date).AddDays(-$minPasswordAge)
+          
+              # Specify the username (sAMAccountName) of the user whose password you want to reset
+              $userName = "usr-az-we-mod-d365-monarch-apim@ebrd.com"
+          
+              # Generate a secure password (customize this as needed)
+              $newPassword = ConvertTo-SecureString -String "$(new_password)" -AsPlainText -Force
+          
+              # Find the user by their username
+              $user = Get-ADUser -Filter {SamAccountName -eq $userName}
+          
+          if ($user) {
+              # Check if the user's password was last set within the specified date range
+              if ($user.PasswordLastSet -ge $minDate -and $user.PasswordLastSet -lt $maxDate) {
+                  # Generate a new password (you can change this to a secure password)
+                  Write-Host "Password reset for user $newPassword within the specified date range."
+                  # Reset the user's password
+                  Set-ADAccountPassword -Identity $user -NewPassword (ConvertTo-SecureString -AsPlainText $newPassword -Force)
+                  #Set-ADUser -Identity $user -ChangePasswordAtLogon $true
+                  Write-Host "Password reset for user $userName within the specified date range."
+              } else {
+                  Write-Host "User $userName does not require a password reset within the specified date range."
+              }
+          } else {
+              Write-Host "User $userName not found."
+          }
+          
+          
+
+
+    
+    
